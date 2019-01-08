@@ -16,19 +16,69 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
+- script: echo This build was generated from a yaml file instead of the GUI build definition.
+
+#Set Build Number
+- powershell: |
+   $BuildDefinitionName = $env:BUILD_DEFINITIONNAME
+   $SourceBranch = $env:BUILD_SOURCEBRANCH
+   
+   [datetime]$now = [datetime]::Now
+   $year = $now.Year.ToString().Substring(2, 2)
+   $dayOfYear = $now.DayOfYear
+   $seconds = [int]($now.TimeOfDay.TotalSeconds / 2)
+   
+   $buildNumber = "$year.$dayOfYear.$seconds"
+   if($SourceBranch -ine "refs/heads/integration") {
+       $prereleaseVersion = $SourceBranch.TrimStart("refs/").TrimStart("heads/").Replace("/", "-").Replace("_","-")
+       $buildNumber = "$buildNumber-$prereleaseVersion"
+   }
+   Write-Verbose "New build number: $buildNumber"
+   Write-Host "##vso[task.setvariable variable=NugetVersionNumber;]$buildNumber"
+   Write-Host "##vso[build.updatebuildnumber]$($env:Build_DefinitionName)_$buildNumber"
+  displayName: 'Set Build Number'
+
+#Nuget tool installer
 - task: NuGetToolInstaller@0
 
+#Nuget restore
 - task: NuGetCommand@2
   inputs:
     restoreSolution: '$(solution)'
 
+#Build
 - task: VSBuild@1
   inputs:
     solution: '$(solution)'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
 
+#Test
 - task: VSTest@2
   inputs:
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
+
+#Create package
+- powershell: |
+   $destDirectory = split-path "$(Build.ArtifactStagingDirectory)\packages\EmdatSSBEA\EmdatSSBEA.zip"
+   if(!(Test-Path $destDirectory))
+   {
+       mkdir $destDirectory
+   }
+  displayName: 'EmdatSSBEA - Create Directory'
+
+- task: CmdLine@1
+  displayName: 'EmdatSSBEA - MSDeploy'
+  inputs:
+    filename: 'C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe'
+
+    arguments: '-verb:sync -source:dirPath="$(Build.SourcesDirectory)\EmdatSSBEA\EmdatSSBEAService\bin\$(BuildConfiguration)\net471" -dest:package="$(Build.ArtifactStagingDirectory)\packages\EmdatSSBEA\EmdatSSBEA.zip" -verbose -skip:Directory=Package -skip:Directory=_deploy -skip:File="(.+\.vshost\..+)|(.+CodeAnalysis.+)|(.+Test.+)|(Moq\..+)|(.+\.dll.config)|(Schema\.ini)|(.+_Accessor.+)"'
+
+#Publish Artifact: packages
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: packages'
+  inputs:
+    PathtoPublish: '$(build.artifactstagingdirectory)\packages'
+
+    ArtifactName: packages
