@@ -20,11 +20,18 @@ namespace EmdatSSBEAService
         /// </summary>
         static void Main(params string[] args)
         {
-			var eaConfig = XElement.Load("EAService.config");
+            Logger.TraceEvent(TraceEventType.Information, "Loading configuration...");
+			var eaConfig = XElement.Load(@"..\Config\EAService.config");
 			XmlNamespaceManager nsman = new XmlNamespaceManager(new NameTable());
 			XNamespace ea = "http://schemas.microsoft.com/sqlserver/2008/10/servicebroker/externalactivator";
 			nsman.AddNamespace("ea", ea.ToString());
-			var notificationElements = eaConfig.XPathSelectElements("ea:NotificationServiceList/ea:NotificationService", nsman);
+            var storedProc = eaConfig.Element(ea + "StoredProcedure").AsString();
+            if (string.IsNullOrWhiteSpace(storedProc))
+            {
+                throw new Exception("The configuration needs to include the StoredProcedure element as a child of the Activator element.");
+            }
+
+            var notificationElements = eaConfig.XPathSelectElements("ea:NotificationServiceList/ea:NotificationService", nsman);
 			if (notificationElements == null || !notificationElements.Any())
 			{
 				throw new Exception("The EAService.config was not configured with notification services.");
@@ -34,7 +41,7 @@ namespace EmdatSSBEAService
 			{
 				var config = new NotificationServiceConfig()
 				{
-					StoredProcedure = notificationElement.Element(ea + "StoredProcedure").AsString(),
+					StoredProcedure = storedProc,
 					ConnectionString = notificationElement.XPathSelectElement("ea:ConnectionString/ea:Unencrypted", nsman).AsString()
 				};
 				notificationConfigs.Add(config);
@@ -61,8 +68,9 @@ namespace EmdatSSBEAService
 				};
 				applicationConfigs.Add(config);
 			}
+            Logger.TraceEvent(TraceEventType.Information, "Configuration loaded successfully.");
 
-			CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 			var applicationServiceList = new ApplicationServiceList(applicationConfigs);
 			var tasks = notificationConfigs
 				.Select(c => new NotificationService(c, applicationServiceList))

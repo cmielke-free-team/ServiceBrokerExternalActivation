@@ -1,0 +1,17 @@
+﻿<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>emdatcustomssbeadatabrokerbwrbe</id>
+    <version>1.0.0</version>
+    <title>Emdat Custom SSBEA DataBroker BWRBE</title>
+    <authors>Emdat</authors>
+    <description>Deploys the emdat developed SSBEA service to the machine.</description>
+    <tags>Emdat SSBEA Service External Activation Service Broker</tags>
+  </metadata>
+  <files>
+	  <file src="bin\Release\net471\*.exe" target="tools" />
+	  <file src="bin\Release\net471\*.exe.config" target="tools" />
+    <file src="bin\Release\net471\*.dll" target="tools" />
+    <file src="ChocoPackages\DATA_Broker\BWRBE\chocolateyinstall.ps1" target="tools" />
+  </files>
+</package>
