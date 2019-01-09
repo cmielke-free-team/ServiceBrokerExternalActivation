@@ -17,11 +17,11 @@ namespace EmdatSSBEAService
         private readonly ApplicationServiceList _applicationServices;
         private static readonly TraceSource traceSource = new TraceSource("Emdat.SSBEA.Service");
 
-        public NotificationService(NotificationServiceConfig config)
+        public NotificationService(NotificationServiceConfig config, ApplicationServiceList applicationServices)
         {
             _connectionString = config.ConnectionString;
             _storedProcedure = config.StoredProcedure;
-            _applicationServices = config.ApplicationServices;
+            _applicationServices = applicationServices;
         }
 
         internal void Execute(CancellationToken cancellationToken)
