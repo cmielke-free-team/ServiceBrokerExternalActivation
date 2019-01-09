@@ -1,5 +1,4 @@
-﻿using EmdatSSBEAService.Configuration;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
@@ -8,6 +7,9 @@ using System.ServiceProcess;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.XPath;
 
 namespace EmdatSSBEAService
 {
@@ -18,14 +20,56 @@ namespace EmdatSSBEAService
         /// </summary>
         static void Main(params string[] args)
         {
-            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-            var notificationServices = ServiceBuilder.GetServices();
-            var tasks = notificationServices
-                .Select(c => new NotificationService(c))
-                .Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
-                .ToArray();
+			var eaConfig = XElement.Load("EAService.config");
+			XmlNamespaceManager nsman = new XmlNamespaceManager(new NameTable());
+			XNamespace ea = "http://schemas.microsoft.com/sqlserver/2008/10/servicebroker/externalactivator";
+			nsman.AddNamespace("ea", ea.ToString());
+			var notificationElements = eaConfig.XPathSelectElements("ea:NotificationServiceList/ea:NotificationService", nsman);
+			if (notificationElements == null || !notificationElements.Any())
+			{
+				throw new Exception("The EAService.config was not configured with notification services.");
+			}
+			var notificationConfigs = new List<NotificationServiceConfig>();
+			foreach (var notificationElement in notificationElements)
+			{
+				var config = new NotificationServiceConfig()
+				{
+					StoredProcedure = notificationElement.Element(ea + "StoredProcedure").AsString(),
+					ConnectionString = notificationElement.XPathSelectElement("ea:ConnectionString/ea:Unencrypted", nsman).AsString()
+				};
+				notificationConfigs.Add(config);
+			}
 
-            if (args.Length == 0)
+			var applicationElements = eaConfig.XPathSelectElements("ea:ApplicationServiceList/ea:ApplicationService", nsman);
+			if (applicationElements == null || !applicationElements.Any())
+			{
+				throw new Exception("The EAService.config was not configured with application services.");
+			}
+			var applicationConfigs = new List<ApplicationServiceConfig>();
+			foreach (var applicationElement in applicationElements)
+			{
+				string maxConcVal = applicationElement.XPathSelectElement("ea:Concurrency", nsman)?.Attribute("max")?.Value;
+				int maxConc = int.TryParse(maxConcVal, out maxConc) ? Math.Max(maxConc, 0) : 0;
+				var config = new ApplicationServiceConfig()
+				{
+					DatabaseName = applicationElement.XPathSelectElement("ea:OnNotification/ea:DatabaseName", nsman).AsString(),
+					SchemaName = applicationElement.XPathSelectElement("ea:OnNotification/ea:SchemaName", nsman).AsString(),
+					QueueName = applicationElement.XPathSelectElement("ea:OnNotification/ea:QueueName", nsman).AsString(),
+					ExecutablePath = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:ImagePath", nsman).AsString(),
+					CommandLineArguments = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:CmdLineArgs", nsman).AsString(),
+					MaxConcurrency = maxConc
+				};
+				applicationConfigs.Add(config);
+			}
+
+			CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+			var applicationServiceList = new ApplicationServiceList(applicationConfigs);
+			var tasks = notificationConfigs
+				.Select(c => new NotificationService(c, applicationServiceList))
+				.Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
+				.ToArray();
+
+			if (args.Length == 0)
             {
                 ExecuteAsWindowsService(tasks, cancellationTokenSource);
             }

@@ -8,6 +8,5 @@
 
         public string ConnectionString { get; internal set; }
         public string StoredProcedure { get; internal set; }
-        public ApplicationServiceList ApplicationServices { get; internal set; } 
     }
 }
