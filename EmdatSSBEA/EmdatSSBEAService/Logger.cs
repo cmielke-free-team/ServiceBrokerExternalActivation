@@ -13,7 +13,7 @@ namespace EmdatSSBEAService
 
         public static void TraceEvent(TraceEventType type, string message)
         {
-            _traceSource.TraceEvent(TraceEventType.Error, 0, message);
+            _traceSource.TraceEvent(type, 0, message);
         }
     }
 }

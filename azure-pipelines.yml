@@ -82,3 +82,24 @@ steps:
     PathtoPublish: '$(build.artifactstagingdirectory)\packages'
 
     ArtifactName: packages
+
+#Choco pack nuspecs
+- task: PowerShell@1
+  displayName: 'choco pack **/*.nuspec'
+  inputs:
+    scriptType: inlineScript
+
+    inlineScript: |
+     get-childitem *.nuspec -recurse | foreach {
+        $nuspec = $_.FullName
+        & choco.exe pack "$nuspec" --outputdirectory "$(Build.ArtifactStagingDirectory)"
+     }
+     
+#Nuget push choco nupkgs to chocolatey feed
+- task: NuGetCommand@2
+  displayName: 'NuGet push'
+  inputs:
+    command: push
+    packagesToPush: '$(Build.ArtifactStagingDirectory)\*.nupkg'
+    publishVstsFeed: 'db34ecb1-c72b-4433-a20d-599c0eb401e0'
+    allowPackageConflicts: true
