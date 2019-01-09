@@ -8,6 +8,12 @@ $serviceDisplayName = "Service Broker External Activator (DATA_Broker.BWRBE)"
 $sourceFolder = "C:\Program Files\Service Broker\External Activator\"
 $destinationFolder = "C:\Program Files\Service Broker\$serviceName"
 $storedProcedure = "dbo.Receive_Messages_BWRBE_NotificationQueue"
+$logFolder = "C:\Log\EmdatSSBEAService"
+
+if (!(Test-Path $logFolder))
+{
+    New-Item -Path $logFolder -ItemType directory
+}
 
 if(!(Test-Path $sourceFolder))
 {
