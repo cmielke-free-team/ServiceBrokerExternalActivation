@@ -34,7 +34,7 @@ if(Test-Path $configFilePath)
     $xml = [xml](Get-Content $tempConfigFile)
     $nsman = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
     $nsman.AddNamespace("ea", $xml.DocumentElement.NamespaceURI)
-    if (!$xml.SelectSingleNode("StoredProcedure", $nsman))
+    if (!$xml.Activator.SelectSingleNode("ea:StoredProcedure", $nsman))
     {
         $element = $xml.CreateElement("StoredProcedure", $xml.DocumentElement.NamespaceURI)
         $element.InnerText = $storedProcedure

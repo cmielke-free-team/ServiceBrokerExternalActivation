@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>emdatcustomssbeadatabrokerbeo</id>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <title>Emdat Custom SSBEA DataBroker BEO</title>
     <authors>Emdat</authors>
     <description>Deploys the emdat developed SSBEA service to the machine.</description>
