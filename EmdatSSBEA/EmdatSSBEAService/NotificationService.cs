@@ -26,51 +26,66 @@ namespace EmdatSSBEAService
 
         internal void Execute(CancellationToken cancellationToken)
         {
-            while (!cancellationToken.WaitHandle.WaitOne(500))
+            Logger.TraceEvent(TraceEventType.Information, "Notification service execute started.");
+            try
             {
-                string connectionString = _connectionString;
-                SqlConnectionStringBuilder connStrBuilder = new SqlConnectionStringBuilder(connectionString);
-                using (var sqlConnection = new SqlConnection(connStrBuilder.ConnectionString))
-                using (var cmd = sqlConnection.CreateCommand())
+                while (!cancellationToken.WaitHandle.WaitOne(500))
                 {
-                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                    cmd.CommandText = _storedProcedure;
-
-                    sqlConnection.Open();
-                    using (var dataReader = cmd.ExecuteReader())
+                    try
                     {
-                        while (dataReader.Read())
+                        string connectionString = _connectionString;
+                        SqlConnectionStringBuilder connStrBuilder = new SqlConnectionStringBuilder(connectionString);
+                        using (var sqlConnection = new SqlConnection(connStrBuilder.ConnectionString))
+                        using (var cmd = sqlConnection.CreateCommand())
                         {
-                            try
+                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                            cmd.CommandText = _storedProcedure;
+
+                            sqlConnection.Open();
+                            using (var dataReader = cmd.ExecuteReader())
                             {
-                                string messageType = (string)dataReader["message_type_name"];
-                                switch (messageType)
+                                while (dataReader.Read())
                                 {
-                                    case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
+                                    try
                                     {
-                                        HandleEventNotification((byte[])dataReader["message_body"]);
-                                        break;
+                                        string messageType = (string)dataReader["message_type_name"];
+                                        switch (messageType)
+                                        {
+                                            case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
+                                            {
+                                                HandleEventNotification((byte[])dataReader["message_body"]);
+                                                break;
+                                            }
+                                            case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
+                                            {
+                                                int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
+                                                break;
+                                            }
+                                            case "http://schemas.microsoft.com/SQL/ServiceBroker/Error":
+                                            {
+                                                int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
+                                                break;
+                                            }
+                                        }
                                     }
-                                    case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
+                                    catch (QueueActivationException ex)
                                     {
-                                        int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
-                                        break;
-                                    }
-                                    case "http://schemas.microsoft.com/SQL/ServiceBroker/Error":
-                                    {
-                                        int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
-                                        break;
+                                        Logger.TraceEvent(TraceEventType.Error, $"{ex}");
                                     }
                                 }
                             }
-                            catch (QueueActivationException ex)
-                            {
-                                Logger.TraceEvent(TraceEventType.Error, $"{ex}");
-                            }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        Logger.TraceEvent(TraceEventType.Error, $"{ex}");
+                        cancellationToken.WaitHandle.WaitOne(60000);
+                    }
                 }
-
+            }
+            finally
+            {
+                Logger.TraceEvent(TraceEventType.Information, "Notification service execute stopped.");
             }
         }
 

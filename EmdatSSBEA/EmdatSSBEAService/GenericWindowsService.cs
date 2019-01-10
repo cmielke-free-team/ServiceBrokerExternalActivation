@@ -25,6 +25,7 @@ namespace EmdatSSBEAService
 
         protected override void OnStart(string[] args)
         {
+            Logger.TraceEvent(TraceEventType.Information, $"Starting the service {this.ServiceName}.");
             foreach (var task in _tasks)
             {
                 task.Start();
@@ -33,8 +34,10 @@ namespace EmdatSSBEAService
 
         protected override void OnStop()
         {
+            Logger.TraceEvent(TraceEventType.Information, "Stopping the service...");
             _cancellationTokenSource.Cancel();
             Task.WaitAll(_tasks);
+            Logger.TraceEvent(TraceEventType.Information, "Stopped the service.");
         }
     }
 }
