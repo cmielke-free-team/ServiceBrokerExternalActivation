@@ -45,7 +45,7 @@ namespace EmdatSSBEAService
                 {
                     throw new Exception("The EAService.config was not configured with notification services.");
                 }
-                
+
                 foreach (var notificationElement in notificationElements)
                 {
                     var config = new NotificationServiceConfig()
@@ -61,7 +61,7 @@ namespace EmdatSSBEAService
                 {
                     throw new Exception("The EAService.config was not configured with application services.");
                 }
-                
+
                 foreach (var applicationElement in applicationElements)
                 {
                     string maxConcVal = applicationElement.XPathSelectElement("ea:Concurrency", nsman)?.Attribute("max")?.Value;
@@ -79,24 +79,30 @@ namespace EmdatSSBEAService
                 }
                 Logger.TraceEvent(TraceEventType.Information, "Configuration parsed successfully.");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.TraceEvent(TraceEventType.Error, $"{ex}");
                 throw ex;
             }
-            
-            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-			var applicationServiceList = new ApplicationServiceList(applicationConfigs);
-			var tasks = notificationConfigs
-				.Select(c => new NotificationService(c, applicationServiceList))
-				.Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
-				.ToArray();
 
-			if (args.Length == 0)
+            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            var applicationServiceList = new ApplicationServiceList(applicationConfigs);
+            var tasks = notificationConfigs
+                .Select(c => new NotificationService(c, applicationServiceList))
+                .Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
+                .ToArray();
+
+            if (args.Length > 0 && args[0].StartsWith("/service:", StringComparison.OrdinalIgnoreCase))
             {
-                ExecuteAsWindowsService(tasks, cancellationTokenSource);
+                var argParts = args[0].Split(':');
+                if (argParts.Length != 2)
+                {
+                    throw new InvalidOperationException($"Invalid argument '{args[0]}'. Expected /service:<serviceName>");
+                }
+
+                ExecuteAsWindowsService(tasks, cancellationTokenSource, argParts[1]);
             }
-            else if (args[0].Equals("--console", StringComparison.OrdinalIgnoreCase))
+            else
             {
                 ExecuteAsConsoleApplication(tasks, cancellationTokenSource);
             }
@@ -115,7 +121,7 @@ namespace EmdatSSBEAService
                 cancellationTokenSource.Cancel();
                 e.Cancel = true;
             };
-            foreach(var task in tasks)
+            foreach (var task in tasks)
             {
                 task.Start();
             }
@@ -126,17 +132,17 @@ namespace EmdatSSBEAService
         /// 
         /// </summary>
         /// <param name="cancellationTokenSource"></param>
-        private static void ExecuteAsWindowsService(Task[] tasks, CancellationTokenSource cancellationTokenSource)
+        private static void ExecuteAsWindowsService(Task[] tasks, CancellationTokenSource cancellationTokenSource, string serviceName)
         {
             //run as service             
             ServiceBase[] ServicesToRun = new ServiceBase[]
             {
                 new GenericWindowsService(
-                    serviceName: "EmdatSSBEAService",
+                    serviceName: serviceName,
                     tasks: tasks,
                     cancellationTokenSource: cancellationTokenSource)
             };
             ServiceBase.Run(ServicesToRun);
-        }        
+        }
     }
 }
