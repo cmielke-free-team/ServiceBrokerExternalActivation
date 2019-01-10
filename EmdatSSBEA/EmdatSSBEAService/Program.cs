@@ -92,11 +92,17 @@ namespace EmdatSSBEAService
 				.Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
 				.ToArray();
 
-			if (args.Length == 0)
+			if (args.Length > 0 && args[0].StartsWith("/service:", StringComparison.OrdinalIgnoreCase))
             {
-                ExecuteAsWindowsService(tasks, cancellationTokenSource);
+                var argParts = args[0].Split(':');
+                if (argParts.Length != 2)
+                {
+                    throw new InvalidOperationException($"Invalid argument '{args[0]}'. Expected /service:<serviceName>");
+                }
+
+                ExecuteAsWindowsService(tasks, cancellationTokenSource, argParts[1]);
             }
-            else if (args[0].Equals("--console", StringComparison.OrdinalIgnoreCase))
+            else
             {
                 ExecuteAsConsoleApplication(tasks, cancellationTokenSource);
             }
@@ -126,13 +132,13 @@ namespace EmdatSSBEAService
         /// 
         /// </summary>
         /// <param name="cancellationTokenSource"></param>
-        private static void ExecuteAsWindowsService(Task[] tasks, CancellationTokenSource cancellationTokenSource)
+        private static void ExecuteAsWindowsService(Task[] tasks, CancellationTokenSource cancellationTokenSource, string serviceName)
         {
             //run as service             
             ServiceBase[] ServicesToRun = new ServiceBase[]
             {
                 new GenericWindowsService(
-                    serviceName: "EmdatSSBEAService",
+                    serviceName: serviceName,
                     tasks: tasks,
                     cancellationTokenSource: cancellationTokenSource)
             };
