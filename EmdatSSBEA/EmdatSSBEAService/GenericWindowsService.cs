@@ -36,7 +36,22 @@ namespace EmdatSSBEAService
         {
             Logger.TraceEvent(TraceEventType.Information, "Stopping the service...");
             _cancellationTokenSource.Cancel();
-            Task.WaitAll(_tasks);
+            try
+            {
+                Task.WaitAll(_tasks);
+            }
+            catch(AggregateException ex)
+            {
+                Logger.TraceEvent(TraceEventType.Information, $"{ex}");
+                foreach(var exception in ex.InnerExceptions)
+                {
+                    Logger.TraceEvent(TraceEventType.Information, $"{exception}");
+                }
+            }
+            catch(Exception ex)
+            {
+                Logger.TraceEvent(TraceEventType.Information, $"{ex}");
+            }
             Logger.TraceEvent(TraceEventType.Information, "Stopped the service.");
         }
     }
