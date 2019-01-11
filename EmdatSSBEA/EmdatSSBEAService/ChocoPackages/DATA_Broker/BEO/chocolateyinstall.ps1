@@ -7,7 +7,7 @@ $serviceName = "SSBExternalActivator.DATA_Broker.BEO"
 $serviceDisplayName = "Service Broker External Activator (DATA_Broker.BEO)"
 $sourceFolder = "C:\Program Files\Service Broker\External Activator\"
 $destinationFolder = "C:\Program Files\Service Broker\$serviceName"
-$storedProcedure = "dbo.Receive_Messages_BEO_NotificationQueue"
+$storedProcedure = "dbo.Receive_Messages_BEO_Notification_Queue"
 $logFolder = "C:\Log\EmdatSSBEAService"
 
 if (!(Test-Path $logFolder))
