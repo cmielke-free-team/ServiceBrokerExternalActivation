@@ -8,7 +8,7 @@ $serviceDisplayName = "Service Broker External Activator (DATA_Broker.BEO)"
 $sourceFolder = "C:\Program Files\Service Broker\External Activator\"
 $destinationFolder = "C:\Program Files\Service Broker\$serviceName"
 $storedProcedure = "dbo.Receive_Messages_BEO_Notification_Queue"
-$logFolder = "C:\Log\EmdatSSBEAService"
+$logFolder = "C:\Log\$serviceName"
 
 if (!(Test-Path $logFolder))
 {
@@ -96,6 +96,17 @@ if ($exePath -and $exePath -ne $desiredExePathWithQuotes)
     $service = Get-WmiObject win32_service | ?{$_.Name -ieq $serviceName }
     $service.delete()
 }
+
+#configure app.config
+$appConfigFile = join-path $destinationFolder "bin\EmdatSSBEAService.exe.config"
+[xml]$appConfig = Get-Content $appConfigFile
+$eventLogNode = $appConfig.configuration.'system.diagnostics'.sharedListeners.add | where {$_.name -ieq "eventlog"}
+$eventLogNode.initializeData = $serviceName
+
+$fileLogNode = $appConfig.configuration.'system.diagnostics'.sharedListeners.add | where {$_.name -ieq "file"}
+$fileLogNode.initializeData = "$logFolder\{MachineName}-{ApplicationName}-{LocalDateTime:yyyyMMddHH}-{ProcessId}.log"
+
+$appConfig.Save($appConfigFile)
 
 #Create the service if it does not exist
 if (!(Get-Service $serviceName -ErrorAction SilentlyContinue))
