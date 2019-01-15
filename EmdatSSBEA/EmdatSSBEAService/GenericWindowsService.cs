@@ -25,11 +25,12 @@ namespace EmdatSSBEAService
 
         protected override void OnStart(string[] args)
         {
-            Logger.TraceEvent(TraceEventType.Information, $"Starting the service {this.ServiceName}.");
+            Logger.TraceEvent(TraceEventType.Information, $"Starting the service {this.ServiceName}...");
             foreach (var task in _tasks)
             {
                 task.Start();
             }
+            Logger.TraceEvent(TraceEventType.Information, $"Started the service {this.ServiceName}.");
         }
 
         protected override void OnStop()

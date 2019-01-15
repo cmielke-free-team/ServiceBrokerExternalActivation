@@ -46,6 +46,11 @@ if(Test-Path $configFilePath)
         $element.InnerText = $storedProcedure
         $xml.DocumentElement.AppendChild($element)
     }
+	else
+	{
+		$spElement = $xml.Activator.SelectSingleNode("ea:StoredProcedure", $nsman);
+		$spElement.InnerText = $storedProcedure
+	}
     $xml.Save($tempConfigFile)
 }
 
@@ -90,7 +95,8 @@ if(!(Get-EventLog -LogName "Application" -Source $serviceName -ErrorAction Silen
 $exePath = Get-WmiObject win32_service | ?{$_.Name -ieq $serviceName } | select -ExpandProperty PathName
 $desiredExePath = ($(join-path $destinationFolder "bin\EmdatSSBEAService.exe")).ToString()
 $desiredExePathWithQuotes = "`"$desiredExePath`""
-if ($exePath -and $exePath -ne $desiredExePathWithQuotes)
+$desiredExePathAndArgs = $desiredExePathWithQuotes + " /service:" + $serviceName
+if ($exePath -and $exePath -ne $desiredExePathAndArgs)
 {
     Write-Host "The service existed for the wrong executable and will be removed."
     $service = Get-WmiObject win32_service | ?{$_.Name -ieq $serviceName }
@@ -108,11 +114,12 @@ $fileLogNode.initializeData = "$logFolder\{MachineName}-{ApplicationName}-{Local
 
 $appConfig.Save($appConfigFile)
 
+
 #Create the service if it does not exist
 if (!(Get-Service $serviceName -ErrorAction SilentlyContinue))
 {
     Write-Host "The service did not exist and will be created."
-    New-Service -Name $serviceName -BinaryPathName "`"$(join-path $destinationFolder "bin\EmdatSSBEAService.exe")`"" -DisplayName $serviceDisplayName -StartupType Automatic -Verbose
+    New-Service -Name $serviceName -BinaryPathName "`"$(join-path $destinationFolder "bin\EmdatSSBEAService.exe")`" /service:$serviceName" -DisplayName $serviceDisplayName -StartupType Automatic -Verbose
 }
 
 #grant full control on the service folder to the service sid
