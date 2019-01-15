@@ -7,7 +7,7 @@ $serviceName = "SSBExternalActivator.DATA_Broker.BWRBE"
 $serviceDisplayName = "Service Broker External Activator (DATA_Broker.BWRBE)"
 $sourceFolder = "C:\Program Files\Service Broker\External Activator\"
 $destinationFolder = "C:\Program Files\Service Broker\$serviceName"
-$storedProcedure = "dbo.Receive_Messages_BWRBE_NotificationQueue"
+$storedProcedure = "dbo.Receive_Messages_BWRBE_Notification_Queue"
 $logFolder = "C:\Log\$serviceName"
 
 if (!(Test-Path $logFolder))
@@ -46,6 +46,11 @@ if(Test-Path $configFilePath)
         $element.InnerText = $storedProcedure
         $xml.DocumentElement.AppendChild($element)
     }
+	else
+	{
+		$spElement = $xml.Activator.SelectSingleNode("ea:StoredProcedure", $nsman);
+		$spElement.InnerText = $storedProcedure
+	}
     $xml.Save($tempConfigFile)
 }
 
