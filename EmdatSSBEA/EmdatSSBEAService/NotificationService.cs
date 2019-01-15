@@ -141,10 +141,10 @@ namespace EmdatSSBEAService
                 {
                     throw new NotImplementedException("TODO");
                 }
-
                 string databaseName = (string)xelement.Element("DatabaseName");
                 string schemaName = (string)xelement.Element("SchemaName");
                 string objectName = (string)xelement.Element("ObjectName");
+                Logger.TraceEvent(TraceEventType.Information, $"Received event notification for queue activation:{databaseName}.{schemaName}.{objectName}.");
                 _applicationServices.Activate(databaseName, schemaName, objectName);
             }
         }
