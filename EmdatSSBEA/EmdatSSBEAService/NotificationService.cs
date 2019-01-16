@@ -5,6 +5,7 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Xml.Linq;
 
@@ -49,21 +50,25 @@ namespace EmdatSSBEAService
                                     try
                                     {
                                         string messageType = (string)dataReader["message_type_name"];
+                                        Guid conversationHandle = (Guid)dataReader["conversation_handle"];
+                                        byte[] messageBody = (byte[])dataReader["message_body"];
+                                        Logger.TraceEvent(TraceEventType.Information, $"Received message type {messageType} on conversation handle {conversationHandle}.");
                                         switch (messageType)
                                         {
                                             case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
                                             {
-                                                HandleEventNotification((byte[])dataReader["message_body"]);
+                                                HandleEventNotification(messageBody);
                                                 break;
                                             }
                                             case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
                                             {
-                                                int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
+                                                int end = this.EndConversation(cmd, conversationHandle, null, null);
                                                 break;
                                             }
                                             case "http://schemas.microsoft.com/SQL/ServiceBroker/Error":
                                             {
-                                                int end = this.EndConversation(cmd, (Guid)dataReader["conversation_handle"], null, null);
+                                                Logger.TraceEvent(TraceEventType.Error, $"Received service broker error with body: {Encoding.Unicode.GetString(messageBody)}");
+                                                int end = this.EndConversation(cmd, conversationHandle, null, null);
                                                 break;
                                             }
                                         }

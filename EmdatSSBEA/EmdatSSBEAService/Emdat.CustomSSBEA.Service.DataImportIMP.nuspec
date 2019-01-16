@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>emdatcustomssbeadataimportimp</id>
-    <version>1.0.11</version>
+    <version>1.0.12</version>
     <title>Emdat Custom SSBEA DataImport IMP</title>
     <authors>Emdat</authors>
     <description>Deploys the emdat developed SSBEA service to the machine.</description>
