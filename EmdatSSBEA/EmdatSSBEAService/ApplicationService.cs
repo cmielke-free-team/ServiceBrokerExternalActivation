@@ -28,7 +28,9 @@ namespace EmdatSSBEAService
             for (int i = 0; i < _processes.Length && !newProcessStarted; i++)
             {
                 if (_processes[i] == null || _processes[i].HasExited)
-                {                    
+                {
+                    Logger.TraceEvent(TraceEventType.Information, 
+                        $"Launching new process {_executablePath}{(string.IsNullOrWhiteSpace(_commandLineArguments) ? "." : " with arguments " + _commandLineArguments + ".")}");
                     _processes[i] = Process.Start(_executablePath, _commandLineArguments);
                     newProcessStarted = true;
                 }
