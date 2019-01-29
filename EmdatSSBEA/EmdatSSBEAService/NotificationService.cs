@@ -51,7 +51,7 @@ namespace EmdatSSBEAService
                                     {
                                         string messageType = (string)dataReader["message_type_name"];
                                         Guid conversationHandle = (Guid)dataReader["conversation_handle"];
-                                        byte[] messageBody = (byte[])dataReader["message_body"];
+                                        byte[] messageBody = dataReader["message_body"] == DBNull.Value ? new byte[0] : (byte[])dataReader["message_body"];
                                         Logger.TraceEvent(TraceEventType.Information, $"Received message type {messageType} on conversation handle {conversationHandle}.");
                                         switch (messageType)
                                         {
@@ -140,11 +140,18 @@ namespace EmdatSSBEAService
         {
             using (var ms = new MemoryStream(messageBody))
             {
+                if (ms.Length == 0)
+                {
+                    Logger.TraceEvent(TraceEventType.Error, $"Received an empty message body for an event notification.");
+                    return;
+                }
+
                 XElement xelement = XElement.Load(ms);
                 string eventType = (string)xelement.Element("EventType");
                 if (eventType != "QUEUE_ACTIVATION")
                 {
-                    throw new NotImplementedException("TODO");
+                    Logger.TraceEvent(TraceEventType.Error, $"Received unexpected event type value:{eventType}");
+                    return;
                 }
                 string databaseName = (string)xelement.Element("DatabaseName");
                 string schemaName = (string)xelement.Element("SchemaName");
