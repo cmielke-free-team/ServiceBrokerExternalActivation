@@ -6,6 +6,7 @@
         public string SchemaName { get; internal set; }
         public string QueueName { get; internal set; }
         public string ExecutablePath { get; internal set; }
+        public string WorkingDirectory { get; internal set; }
         public string CommandLineArguments { get; internal set; }
         public int MaxConcurrency { get; internal set; }
     }

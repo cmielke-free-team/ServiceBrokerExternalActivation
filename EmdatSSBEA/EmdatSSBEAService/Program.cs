@@ -72,6 +72,7 @@ namespace EmdatSSBEAService
                         SchemaName = applicationElement.XPathSelectElement("ea:OnNotification/ea:SchemaName", nsman).AsString(),
                         QueueName = applicationElement.XPathSelectElement("ea:OnNotification/ea:QueueName", nsman).AsString(),
                         ExecutablePath = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:ImagePath", nsman).AsString(),
+                        WorkingDirectory = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:WorkDir", nsman).AsString(),
                         CommandLineArguments = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:CmdLineArgs", nsman).AsString(),
                         MaxConcurrency = maxConc
                     };

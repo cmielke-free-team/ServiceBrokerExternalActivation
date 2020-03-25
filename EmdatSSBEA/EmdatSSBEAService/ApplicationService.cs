@@ -9,6 +9,7 @@ namespace EmdatSSBEAService
         private readonly string _schemaName;
         private readonly string _queueName;
         private readonly string _executablePath;
+        private readonly string _workingDirectory;
         private readonly string _commandLineArguments;
         private readonly Process[] _processes;        
 
@@ -18,6 +19,7 @@ namespace EmdatSSBEAService
             _schemaName = config.SchemaName;
             _queueName = config.QueueName;
             _executablePath = config.ExecutablePath;
+            _workingDirectory = config.WorkingDirectory;
             _commandLineArguments = config.CommandLineArguments;
             _processes = new Process[config.MaxConcurrency];
         }
@@ -31,7 +33,13 @@ namespace EmdatSSBEAService
                 {
                     Logger.TraceEvent(TraceEventType.Information, 
                         $"Launching new process {_executablePath}{(string.IsNullOrWhiteSpace(_commandLineArguments) ? "." : " with arguments " + _commandLineArguments + ".")}");
-                    _processes[i] = Process.Start(_executablePath, _commandLineArguments);
+                    var startInfo = new ProcessStartInfo
+                    {
+                        WorkingDirectory = _workingDirectory,
+                        FileName = _executablePath,
+                        Arguments = _commandLineArguments
+                    };
+                    _processes[i] = Process.Start(startInfo);
                     newProcessStarted = true;
                 }
             }
