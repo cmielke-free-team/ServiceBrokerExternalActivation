@@ -20,11 +20,24 @@ if(!(Test-Path $sourceFolder))
     throw "The source folder does not exist: $sourceFolder. Make sure the default instance of SSBEA was successfully installed."
 }
 
+#kill service processes, they were staying open after stopping the service
+$id = Get-WmiObject -Class Win32_Service -Filter "Name LIKE '$serviceName'" | 
+      Select-Object -ExpandProperty ProcessId
+if ($id -and $id -ne 0) {
+    Write-Host "Found Process $id, killing process..."
+    $process = Get-Process -Id $id
+    if ($process) {
+        $process.Kill()
+    }
+}
+
+#stop service if still applicable
 $svc = 
     Get-Service | 
     where { $_.Name -ieq $serviceName } | 
     where { $_.Status -ieq "Running" } |
     Stop-Service -PassThru -Force    
+
 
 if(!(Test-Path $destinationFolder))
 {
