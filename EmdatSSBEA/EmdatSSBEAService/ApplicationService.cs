@@ -46,7 +46,7 @@ namespace EmdatSSBEAService
 
             if(!newProcessStarted)
             {
-                throw new QueueActivationException($"The maximum number of processes are already running: {_processes.Length}");
+                throw new MaximumQueueReadersException(_processes.Length);
             }            
         }
     }

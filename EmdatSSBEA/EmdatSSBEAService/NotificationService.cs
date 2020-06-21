@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Transactions;
 using System.Xml.Linq;
 
 namespace EmdatSSBEAService
@@ -16,7 +17,6 @@ namespace EmdatSSBEAService
         private readonly string _connectionString;
         private readonly string _storedProcedure;
         private readonly ApplicationServiceList _applicationServices;
-        private static readonly TraceSource traceSource = new TraceSource("Emdat.SSBEA.Service");
 
         public NotificationService(NotificationServiceConfig config, ApplicationServiceList applicationServices)
         {
@@ -35,55 +35,81 @@ namespace EmdatSSBEAService
                     try
                     {
                         string connectionString = _connectionString;
-                        SqlConnectionStringBuilder connStrBuilder = new SqlConnectionStringBuilder(connectionString);
-                        using (var sqlConnection = new SqlConnection(connStrBuilder.ConnectionString))
-                        using (var cmd = sqlConnection.CreateCommand())
+                        SqlConnectionStringBuilder connStrBuilder = new SqlConnectionStringBuilder(connectionString);                        
+                        using (var sqlConnection = new SqlConnection(connStrBuilder.ConnectionString))                                                    
                         {
-                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                            cmd.CommandText = _storedProcedure;
-
                             sqlConnection.Open();
-                            using (var dataReader = cmd.ExecuteReader())
+                            using (var transaction = sqlConnection.BeginTransaction())
+                            using (var cmd = sqlConnection.CreateCommand())
                             {
-                                while (dataReader.Read())
+                                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                                cmd.CommandText = _storedProcedure;
+                                cmd.Transaction = transaction;
+                                using (var dataReader = cmd.ExecuteReader())
                                 {
-                                    try
+                                    while (dataReader.Read())
                                     {
-                                        string messageType = (string)dataReader["message_type_name"];
-                                        Guid conversationHandle = (Guid)dataReader["conversation_handle"];
-                                        byte[] messageBody = dataReader["message_body"] == DBNull.Value ? new byte[0] : (byte[])dataReader["message_body"];
-                                        Logger.TraceEvent(TraceEventType.Information, $"Received message type {messageType} on conversation handle {conversationHandle}.");
-                                        switch (messageType)
+                                        try
                                         {
-                                            case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
+                                            string messageType = (string)dataReader["message_type_name"];
+                                            Guid conversationHandle = (Guid)dataReader["conversation_handle"];
+                                            byte[] messageBody = dataReader["message_body"] == DBNull.Value ? new byte[0] : (byte[])dataReader["message_body"];
+                                            Logger.TraceEvent(TraceEventType.Information, $"Received message type {messageType} on conversation handle {conversationHandle}.");
+                                            switch (messageType)
                                             {
-                                                HandleEventNotification(messageBody);
-                                                break;
-                                            }
-                                            case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
-                                            {
-                                                int end = this.EndConversation(cmd, conversationHandle, null, null);
-                                                break;
-                                            }
-                                            case "http://schemas.microsoft.com/SQL/ServiceBroker/Error":
-                                            {
-                                                Logger.TraceEvent(TraceEventType.Error, $"Received service broker error with body: {Encoding.Unicode.GetString(messageBody)}");
-                                                int end = this.EndConversation(cmd, conversationHandle, null, null);
-                                                break;
+                                                case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
+                                                {
+                                                    HandleEventNotification(messageBody);
+                                                    break;
+                                                }
+                                                case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
+                                                {
+                                                    int end = this.EndConversation(cmd, conversationHandle, null, null);
+                                                    break;
+                                                }
+                                                case "http://schemas.microsoft.com/SQL/ServiceBroker/Error":
+                                                {
+                                                    Logger.TraceEvent(TraceEventType.Error, $"Received service broker error with body: {Encoding.Unicode.GetString(messageBody)}");
+                                                    int end = this.EndConversation(cmd, conversationHandle, null, null);
+                                                    break;
+                                                }
                                             }
                                         }
-                                    }
-                                    catch (QueueActivationException ex)
-                                    {
-                                        Logger.TraceEvent(TraceEventType.Error, $"{ex}");
-                                    }
+                                        catch(MaximumQueueReadersException ex)
+                                        {
+                                            //if the maximum number of queue readers are already active, then log an informational message, 
+                                            //rollback the transaction so another server has a chance to pick it up, and rethrow the exception 
+                                            //to break out of the message processing loop
+                                            Logger.TraceEvent(TraceEventType.Information, $"{ex}");
+                                            transaction.Rollback();
+                                            throw;
+                                        }
+                                        catch (QueueActivationException ex)
+                                        {
+                                            //if the queue reader could not be activated for some other reason (e.g. the service does not have 
+                                            //an activation process configured for this queue), the log an error, but do not rollback the 
+                                            //transaction so that this message does not block other messages from being processed. Note that by 
+                                            //not rolling back the transaction, no other server will have a chance to handle this event 
+                                            //notification and this queue will be stuck in a NOTIFIED state.
+                                            Logger.TraceEvent(TraceEventType.Error, $"{ex}");
+                                        }
+
+                                    }                                    
                                 }
+                                transaction.Commit();
                             }
                         }
                     }
+                    catch(MaximumQueueReadersException)
+                    {
+                        //if the maximum number of queue readers was hit, sleep for 5 seconds before trying again
+                        Logger.TraceEvent(TraceEventType.Verbose, $"Maximum number of queue readers was hit - sleeping for 5 seconds.");
+                        cancellationToken.WaitHandle.WaitOne(5000);
+                    }                    
                     catch (Exception ex)
                     {
                         Logger.TraceEvent(TraceEventType.Error, $"{ex}");
+                        Logger.TraceEvent(TraceEventType.Verbose, $"An exception occurred - sleeping for 60 seconds.");
                         cancellationToken.WaitHandle.WaitOne(60000);
                     }
                 }
@@ -92,11 +118,11 @@ namespace EmdatSSBEAService
             {
                 Logger.TraceEvent(TraceEventType.Information, "Notification service execute stopped.");
             }
-        }
+        }       
 
         private int EndConversation(SqlCommand cmd, Guid conversationHandle, Int32? failureCode, String failureDescription)
         {
-            traceSource.TraceEvent(System.Diagnostics.TraceEventType.Start, 0, "SSBEndConversation");
+            Logger.TraceEvent(System.Diagnostics.TraceEventType.Start, "SSBEndConversation");
             try
             {
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
@@ -132,7 +158,7 @@ namespace EmdatSSBEAService
             }
             finally
             {
-                traceSource.TraceEvent(System.Diagnostics.TraceEventType.Stop, 0);
+                Logger.TraceEvent(System.Diagnostics.TraceEventType.Stop, "SSBEndConversation");
             }
         }
 
@@ -159,6 +185,6 @@ namespace EmdatSSBEAService
                 Logger.TraceEvent(TraceEventType.Information, $"Received event notification for queue activation:{databaseName}.{schemaName}.{objectName}.");
                 _applicationServices.Activate(databaseName, schemaName, objectName);
             }
-        }
+        }        
     }
 }
