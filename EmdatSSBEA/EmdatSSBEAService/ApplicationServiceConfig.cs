@@ -9,5 +9,6 @@
         public string WorkingDirectory { get; internal set; }
         public string CommandLineArguments { get; internal set; }
         public int MaxConcurrency { get; internal set; }
+        public int MinConcurrency { get; internal set; }
     }
 }

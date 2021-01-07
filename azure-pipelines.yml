@@ -40,6 +40,8 @@ steps:
 
 #Nuget tool installer
 - task: NuGetToolInstaller@0
+  inputs:
+    versionSpec: '4.x'
 
 #Nuget restore
 - task: NuGetCommand@2

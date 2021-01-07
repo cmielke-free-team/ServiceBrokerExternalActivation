@@ -57,7 +57,7 @@ namespace EmdatSSBEAService
                                         {
                                             case "http://schemas.microsoft.com/SQL/Notifications/EventNotification":
                                             {
-                                                HandleEventNotification(messageBody);
+                                                HandleEventNotification(messageBody, cancellationToken);
                                                 break;
                                             }
                                             case "http://schemas.microsoft.com/SQL/ServiceBroker/EndDialog":
@@ -91,6 +91,30 @@ namespace EmdatSSBEAService
             finally
             {
                 Logger.TraceEvent(TraceEventType.Information, "Notification service execute stopped.");
+            }
+        }
+
+        internal void MonitorQueueReaders(CancellationToken cancellationToken)
+        {
+            Logger.TraceEvent(TraceEventType.Information, "Notification service queue reader monitor started.");
+            try
+            {
+                while (!cancellationToken.WaitHandle.WaitOne(61000))
+                {
+                    try
+                    {
+                        _applicationServices.MonitorQueueReaders();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.TraceEvent(TraceEventType.Error, $"{ex}");
+                        cancellationToken.WaitHandle.WaitOne(60000);
+                    }
+                }
+            }
+            finally
+            {
+                Logger.TraceEvent(TraceEventType.Information, "Notification service queue reader monitor stopped.");
             }
         }
 
@@ -136,7 +160,7 @@ namespace EmdatSSBEAService
             }
         }
 
-        private void HandleEventNotification(byte[] messageBody)
+        private void HandleEventNotification(byte[] messageBody, CancellationToken cancellationToken)
         {
             using (var ms = new MemoryStream(messageBody))
             {
@@ -157,7 +181,26 @@ namespace EmdatSSBEAService
                 string schemaName = (string)xelement.Element("SchemaName");
                 string objectName = (string)xelement.Element("ObjectName");
                 Logger.TraceEvent(TraceEventType.Information, $"Received event notification for queue activation:{databaseName}.{schemaName}.{objectName}.");
-                _applicationServices.Activate(databaseName, schemaName, objectName);
+
+                //Some queue readers need time to "wind down" after the queue is empty (e.g. flush telemetry to App Insights). If 
+                //all queue readers happen to be winding down at the same time and a new activation event is received, then the queue 
+                //may get stuck in a NOTFIED state. To work around this issue, retry the activation for up to 10 seconds to give the 
+                //queue readers time to finish winding down.
+                DateTime retryUntil = DateTime.Now.AddSeconds(10);
+                bool activated = false;
+                do
+                {
+                    try
+                    {
+                        _applicationServices.Activate(databaseName, schemaName, objectName);
+                        activated = true;
+                    }
+                    catch(MaximumQueueReadersException ex)
+                    {
+                        Logger.TraceEvent(TraceEventType.Information, ex.Message);
+                    }
+                }
+                while (!activated && DateTime.Now < retryUntil && !cancellationToken.WaitHandle.WaitOne(100));
             }
         }
     }

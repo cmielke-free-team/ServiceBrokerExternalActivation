@@ -65,7 +65,9 @@ namespace EmdatSSBEAService
                 foreach (var applicationElement in applicationElements)
                 {
                     string maxConcVal = applicationElement.XPathSelectElement("ea:Concurrency", nsman)?.Attribute("max")?.Value;
+                    string minConcVal = applicationElement.XPathSelectElement("ea:Concurrency", nsman)?.Attribute("min")?.Value;
                     int maxConc = int.TryParse(maxConcVal, out maxConc) ? Math.Max(maxConc, 0) : 0;
+                    int minConc = int.TryParse(minConcVal, out minConc) ? Math.Max(minConc, 0) : 0;
                     var config = new ApplicationServiceConfig()
                     {
                         DatabaseName = applicationElement.XPathSelectElement("ea:OnNotification/ea:DatabaseName", nsman).AsString(),
@@ -74,7 +76,8 @@ namespace EmdatSSBEAService
                         ExecutablePath = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:ImagePath", nsman).AsString(),
                         WorkingDirectory = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:WorkDir", nsman).AsString(),
                         CommandLineArguments = applicationElement.XPathSelectElement("ea:LaunchInfo/ea:CmdLineArgs", nsman).AsString(),
-                        MaxConcurrency = maxConc
+                        MaxConcurrency = maxConc,
+                        MinConcurrency = minConc
                     };
                     applicationConfigs.Add(config);
                 }
@@ -90,7 +93,11 @@ namespace EmdatSSBEAService
             var applicationServiceList = new ApplicationServiceList(applicationConfigs);
             var tasks = notificationConfigs
                 .Select(c => new NotificationService(c, applicationServiceList))
-                .Select(n => new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning))
+                .SelectMany(n => new []
+                {
+                    new Task(() => n.Execute(cancellationTokenSource.Token), TaskCreationOptions.LongRunning),
+                    new Task(() => n.MonitorQueueReaders(cancellationTokenSource.Token), TaskCreationOptions.LongRunning)
+                })                
                 .ToArray();
 
             if (args.Length > 0 && args[0].StartsWith("/service:", StringComparison.OrdinalIgnoreCase))
