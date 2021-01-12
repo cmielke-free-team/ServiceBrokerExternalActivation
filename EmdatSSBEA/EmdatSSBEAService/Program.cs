@@ -21,10 +21,13 @@ namespace EmdatSSBEAService
         /// </summary>
         static void Main(params string[] args)
         {
+            string testPassword = "pwd";
+            Logger.TraceEvent(TraceEventType.Verbose, $"testPassword={testPassword}");
+
             var notificationConfigs = new List<NotificationServiceConfig>();
             var applicationConfigs = new List<ApplicationServiceConfig>();
             try
-            {
+            {                
                 Logger.TraceEvent(TraceEventType.Information, "Loading configuration...");
                 var appDirectory = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 FileInfo file = new FileInfo(appDirectory);
