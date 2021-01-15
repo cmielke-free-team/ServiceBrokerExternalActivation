@@ -21,9 +21,6 @@ namespace EmdatSSBEAService
         /// </summary>
         static void Main(params string[] args)
         {
-            string testPassword = "pwd";
-            Logger.TraceEvent(TraceEventType.Verbose, $"testPassword={testPassword}");
-
             var notificationConfigs = new List<NotificationServiceConfig>();
             var applicationConfigs = new List<ApplicationServiceConfig>();
             try
